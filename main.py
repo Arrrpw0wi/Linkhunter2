@@ -122,9 +122,9 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['current_index'] = 0
     context.user_data['links_to_delete'] = []
     
-    # Only WhatsApp links (limit to 3 for quick testing)
+    # Only WhatsApp links (limit to 30 for testing)
     all_links = []
-    for link in saved_links["chat.whatsapp"][:3]:  # First 3 WhatsApp links
+    for link in saved_links["chat.whatsapp"][:30]:  # First 30 WhatsApp links
         all_links.append(("chat.whatsapp", link))
     
     context.user_data['current_links'] = all_links
