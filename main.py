@@ -76,20 +76,33 @@ async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📂 لا يوجد روابط مخزنة حالياً.")
         return
 
-    reply = "📁 الروابط المخزنة:\n\n"
+    # Send summary first
+    total_tme = len(saved_links["t.me"])
+    total_whatsapp = len(saved_links["chat.whatsapp"])
+    summary = f"📁 ملخص الروابط المخزنة:\n"
+    summary += f"📌 تيليجرام: {total_tme} رابط\n"
+    summary += f"📌 واتساب: {total_whatsapp} رابط\n\n"
+    summary += "سيتم إرسال الروابط على دفعات..."
+    
+    await update.message.reply_text(summary)
 
+    # Send Telegram links in chunks
     if saved_links["t.me"]:
-        reply += "📌 روابط تيليجرام:\n"
-        for link in saved_links["t.me"]:
-            reply += f"- {link}\n"
-        reply += "\n"
+        await update.message.reply_text("📌 روابط تيليجرام:")
+        chunk_size = 20
+        for i in range(0, len(saved_links["t.me"]), chunk_size):
+            chunk = saved_links["t.me"][i:i+chunk_size]
+            reply = f"الجزء {i//chunk_size + 1}:\n" + "\n".join(f"- {link}" for link in chunk)
+            await update.message.reply_text(reply)
 
+    # Send WhatsApp links in chunks
     if saved_links["chat.whatsapp"]:
-        reply += "📌 روابط واتساب:\n"
-        for link in saved_links["chat.whatsapp"]:
-            reply += f"- {link}\n"
-
-    await update.message.reply_text(reply)
+        await update.message.reply_text("📌 روابط واتساب:")
+        chunk_size = 20
+        for i in range(0, len(saved_links["chat.whatsapp"]), chunk_size):
+            chunk = saved_links["chat.whatsapp"][i:i+chunk_size]
+            reply = f"الجزء {i//chunk_size + 1}:\n" + "\n".join(f"- {link}" for link in chunk)
+            await update.message.reply_text(reply)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 أرسل روابط تيليجرام أو واتساب وسأخزنها بدون تكرار.")
