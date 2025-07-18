@@ -94,8 +94,12 @@ async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 أرسل روابط تيليجرام أو واتساب وسأخزنها بدون تكرار.")
 
-# 🔐 استبدل هذا بالتوكن الخاص بك
-TOKEN = "7946848671:AAHahMqTMIEOUQpYtdVo7n5FjI8hjgnWrlI"
+# 🔐 التوكن من متغيرات البيئة
+TOKEN = os.getenv("TOKEN")
+
+if not TOKEN:
+    print("❌ لم يتم العثور على التوكن! تأكد من إضافة TOKEN في الـ Secrets")
+    exit()
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
