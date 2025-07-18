@@ -7,6 +7,14 @@ from urllib.parse import urlparse
 
 DB_FILE = "saved_links.json"
 
+def save_db():
+    with open(DB_FILE, "w") as f:
+        json.dump({
+            "links": saved_links,
+            "checked_links": checked_links,
+            "deleted_links": deleted_links
+        }, f, indent=2)
+
 if os.path.exists(DB_FILE):
     with open(DB_FILE, "r") as f:
         try:
@@ -34,13 +42,7 @@ else:
     checked_links = {"t.me": [], "chat.whatsapp": []}
     deleted_links = {"t.me": [], "chat.whatsapp": []}
 
-def save_db():
-    with open(DB_FILE, "w") as f:
-        json.dump({
-            "links": saved_links,
-            "checked_links": checked_links,
-            "deleted_links": deleted_links
-        }, f, indent=2)
+
 
 def extract_links(text):
     tme_links = re.findall(r"https?://t\.me/\S+", text)
