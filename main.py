@@ -71,6 +71,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(reply)
 
+async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not saved_links["t.me"] and not saved_links["chat.whatsapp"]:
+        await update.message.reply_text("📂 لا يوجد روابط مخزنة حالياً.")
+        return
+
+    reply = "📁 الروابط المخزنة:\n\n"
+
+    if saved_links["t.me"]:
+        reply += "📌 روابط تيليجرام:\n"
+        for link in saved_links["t.me"]:
+            reply += f"- {link}\n"
+        reply += "\n"
+
+    if saved_links["chat.whatsapp"]:
+        reply += "📌 روابط واتساب:\n"
+        for link in saved_links["chat.whatsapp"]:
+            reply += f"- {link}\n"
+
+    await update.message.reply_text(reply)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 أرسل روابط تيليجرام أو واتساب وسأخزنها بدون تكرار.")
 
@@ -81,6 +101,7 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("show", show_links))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("✅ البوت شغال... انتظر الرسائل")
