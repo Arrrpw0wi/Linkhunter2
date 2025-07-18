@@ -150,7 +150,7 @@ async def send_link_check_message(update_or_query, context: ContextTypes.DEFAULT
     
     message_text = f"📍 الرابط {index + 1}/{len(current_links)}\n🔗 {link_url}\n📱 منصة: {platform_name}\n\nهل هذا الرابط يعمل؟"
     
-    if hasattr(update_or_query, 'message'):  # It's a callback query
+    if hasattr(update_or_query, 'edit_message_text'):  # It's a callback query
         await update_or_query.edit_message_text(message_text, reply_markup=reply_markup)
     else:  # It's an update from message
         await update_or_query.message.reply_text(message_text, reply_markup=reply_markup)
