@@ -9,13 +9,23 @@ DB_FILE = "saved_links.json"
 
 if os.path.exists(DB_FILE):
     with open(DB_FILE, "r") as f:
-        saved_links = json.load(f)
+        data = json.load(f)
+        # Ensure backwards compatibility
+        saved_links = data.get("links", {"t.me": [], "chat.whatsapp": []})
+        checked_links = data.get("checked_links", {"t.me": [], "chat.whatsapp": []})
+        deleted_links = data.get("deleted_links", {"t.me": [], "chat.whatsapp": []})
 else:
     saved_links = {"t.me": [], "chat.whatsapp": []}
+    checked_links = {"t.me": [], "chat.whatsapp": []}
+    deleted_links = {"t.me": [], "chat.whatsapp": []}
 
 def save_db():
     with open(DB_FILE, "w") as f:
-        json.dump(saved_links, f, indent=2)
+        json.dump({
+            "links": saved_links,
+            "checked_links": checked_links,
+            "deleted_links": deleted_links
+        }, f, indent=2)
 
 def extract_links(text):
     tme_links = re.findall(r"https?://t\.me/\S+", text)
@@ -45,14 +55,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     duplicate_count = 0
     
     for link in tme_links:
-        if link not in saved_links["t.me"]:
+        if link not in deleted_links["t.me"] and link not in saved_links["t.me"]:
             saved_links["t.me"].append(link)
             new_tme.append(link)
         else:
             duplicate_count += 1
     
     for link in whatsapp_links:
-        if link not in saved_links["chat.whatsapp"]:
+        if link not in deleted_links["chat.whatsapp"] and link not in saved_links["chat.whatsapp"]:
             saved_links["chat.whatsapp"].append(link)
             new_whatsapp.append(link)
         else:
@@ -109,11 +119,14 @@ async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply)
 
 async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not saved_links["chat.whatsapp"]:
-        await update.message.reply_text("📂 لا يوجد روابط واتساب مخزنة للفحص.")
+    # Count unchecked WhatsApp links
+    unchecked_whatsapp = [link for link in saved_links["chat.whatsapp"] if link not in checked_links["chat.whatsapp"]]
+    
+    if not unchecked_whatsapp:
+        await update.message.reply_text("📂 لا يوجد روابط واتساب جديدة للفحص.\n✅ جميع الروابط تم فحصها مسبقاً.")
         return
     
-    await update.message.reply_text("🔍 سأبدأ بفحص روابط واتساب المخزنة...\nاضغط على الأزرار للتحكم في الروابط.")
+    await update.message.reply_text(f"🔍 سأبدأ بفحص {len(unchecked_whatsapp)} رابط واتساب جديد...\nاضغط على الأزرار للتحكم في الروابط.")
     
     # Store user state for link checking
     user_id = update.effective_user.id
@@ -122,9 +135,10 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['current_index'] = 0
     context.user_data['links_to_delete'] = []
     
-    # Only WhatsApp links (limit to 30 for testing)
+    # Only unchecked WhatsApp links (limit to 30 for testing)
     all_links = []
-    for link in saved_links["chat.whatsapp"][:30]:  # First 30 WhatsApp links
+    unchecked_whatsapp = [link for link in saved_links["chat.whatsapp"] if link not in checked_links["chat.whatsapp"]]
+    for link in unchecked_whatsapp[:30]:  # First 30 unchecked WhatsApp links
         all_links.append(("chat.whatsapp", link))
     
     context.user_data['current_links'] = all_links
@@ -163,10 +177,15 @@ async def handle_link_verification_callback(update: Update, context: ContextType
     current_links = context.user_data['current_links']
     current_index = context.user_data['current_index']
     
+    link_type, link_url = current_links[current_index]
+    
     if query.data == "link_broken":
         # Mark link for deletion
-        link_type, link_url = current_links[current_index]
         context.user_data['links_to_delete'].append((link_type, link_url))
+    else:
+        # Mark as checked (working)
+        if link_url not in checked_links[link_type]:
+            checked_links[link_type].append(link_url)
     
     # Move to next link
     current_index += 1
@@ -179,16 +198,18 @@ async def handle_link_verification_callback(update: Update, context: ContextType
         links_to_delete = context.user_data['links_to_delete']
         
         if links_to_delete:
-            # Delete non-working links
+            # Delete non-working links and add to deleted list
             deleted_count = 0
             for link_type, link_url in links_to_delete:
                 if link_url in saved_links[link_type]:
                     saved_links[link_type].remove(link_url)
+                    deleted_links[link_type].append(link_url)
                     deleted_count += 1
             
             save_db()
             await query.edit_message_text(f"🗑️ تم حذف {deleted_count} رابط غير فعال.\n✅ تم الانتهاء من فحص الروابط!")
         else:
+            save_db()  # Save checked links status
             await query.edit_message_text("✅ جميع الروابط تعمل بشكل جيد!\n✅ تم الانتهاء من فحص الروابط!")
         
         # Clear user state
