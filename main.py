@@ -1,5 +1,5 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 import re
 import json
 import os
@@ -113,7 +113,7 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📂 لا يوجد روابط مخزنة للفحص.")
         return
     
-    await update.message.reply_text("🔍 سأبدأ بفحص الروابط المخزنة...\nأرسل 'نعم' إذا كان الرابط يعمل أو 'لا' إذا كان لا يعمل.")
+    await update.message.reply_text("🔍 سأبدأ بفحص الروابط المخزنة...\nاضغط على الأزرار للتحكم في الروابط.")
     
     # Store user state for link checking
     user_id = update.effective_user.id
@@ -122,33 +122,50 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['current_index'] = 0
     context.user_data['links_to_delete'] = []
     
-    # Combine all links with their types
+    # Combine all links with their types (limit to 10 for testing)
     all_links = []
-    for link in saved_links["t.me"]:
+    for link in saved_links["t.me"][:5]:  # First 5 Telegram links
         all_links.append(("t.me", link))
-    for link in saved_links["chat.whatsapp"]:
+    for link in saved_links["chat.whatsapp"][:5]:  # First 5 WhatsApp links
         all_links.append(("chat.whatsapp", link))
     
     context.user_data['current_links'] = all_links
     
     if all_links:
-        link_type, link_url = all_links[0]
-        platform_name = "تيليجرام" if link_type == "t.me" else "واتساب"
-        await update.message.reply_text(f"📍 الرابط {1}/{len(all_links)}\n🔗 {link_url}\n📱 منصة: {platform_name}\n\nهل هذا الرابط يعمل؟ (نعم/لا)")
+        await send_link_check_message(update, context, 0)
 
-async def handle_link_verification(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get('checking_links', False):
-        return False
+async def send_link_check_message(update_or_query, context: ContextTypes.DEFAULT_TYPE, index: int):
+    current_links = context.user_data['current_links']
+    link_type, link_url = current_links[index]
+    platform_name = "تيليجرام" if link_type == "t.me" else "واتساب"
     
-    response = update.message.text.strip().lower()
-    if response not in ['نعم', 'لا', 'yes', 'no']:
-        await update.message.reply_text("⚠️ يرجى الرد بـ 'نعم' أو 'لا' فقط.")
-        return True
+    # Create inline keyboard
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ يعمل", callback_data="link_works"),
+            InlineKeyboardButton("❌ لا يعمل", callback_data="link_broken")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    message_text = f"📍 الرابط {index + 1}/{len(current_links)}\n🔗 {link_url}\n📱 منصة: {platform_name}\n\nهل هذا الرابط يعمل؟"
+    
+    if hasattr(update_or_query, 'message'):  # It's a callback query
+        await update_or_query.edit_message_text(message_text, reply_markup=reply_markup)
+    else:  # It's an update from message
+        await update_or_query.message.reply_text(message_text, reply_markup=reply_markup)
+
+async def handle_link_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if not context.user_data.get('checking_links', False):
+        return
     
     current_links = context.user_data['current_links']
     current_index = context.user_data['current_index']
     
-    if response in ['لا', 'no']:
+    if query.data == "link_broken":
         # Mark link for deletion
         link_type, link_url = current_links[current_index]
         context.user_data['links_to_delete'].append((link_type, link_url))
@@ -158,9 +175,7 @@ async def handle_link_verification(update: Update, context: ContextTypes.DEFAULT
     context.user_data['current_index'] = current_index
     
     if current_index < len(current_links):
-        link_type, link_url = current_links[current_index]
-        platform_name = "تيليجرام" if link_type == "t.me" else "واتساب"
-        await update.message.reply_text(f"📍 الرابط {current_index + 1}/{len(current_links)}\n🔗 {link_url}\n📱 منصة: {platform_name}\n\nهل هذا الرابط يعمل؟ (نعم/لا)")
+        await send_link_check_message(query, context, current_index)
     else:
         # Finished checking all links
         links_to_delete = context.user_data['links_to_delete']
@@ -174,14 +189,16 @@ async def handle_link_verification(update: Update, context: ContextTypes.DEFAULT
                     deleted_count += 1
             
             save_db()
-            await update.message.reply_text(f"🗑️ تم حذف {deleted_count} رابط غير فعال.\n✅ تم الانتهاء من فحص الروابط!")
+            await query.edit_message_text(f"🗑️ تم حذف {deleted_count} رابط غير فعال.\n✅ تم الانتهاء من فحص الروابط!")
         else:
-            await update.message.reply_text("✅ جميع الروابط تعمل بشكل جيد!\n✅ تم الانتهاء من فحص الروابط!")
+            await query.edit_message_text("✅ جميع الروابط تعمل بشكل جيد!\n✅ تم الانتهاء من فحص الروابط!")
         
         # Clear user state
         context.user_data.clear()
-    
-    return True
+
+async def handle_link_verification(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # This function is no longer needed as we use callback handlers
+    return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 أرسل روابط تيليجرام أو واتساب وسأخزنها بدون تكرار.\n\n🔍 استخدم /check لفحص الروابط المخزنة وحذف غير الفعالة.")
@@ -199,6 +216,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("show", show_links))
     app.add_handler(CommandHandler("check", check_links))
+    app.add_handler(CallbackQueryHandler(handle_link_verification_callback, pattern="^link_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("✅ البوت شغال... انتظر الرسائل")
