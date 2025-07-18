@@ -109,11 +109,11 @@ async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply)
 
 async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not saved_links["t.me"] and not saved_links["chat.whatsapp"]:
-        await update.message.reply_text("📂 لا يوجد روابط مخزنة للفحص.")
+    if not saved_links["chat.whatsapp"]:
+        await update.message.reply_text("📂 لا يوجد روابط واتساب مخزنة للفحص.")
         return
     
-    await update.message.reply_text("🔍 سأبدأ بفحص الروابط المخزنة...\nاضغط على الأزرار للتحكم في الروابط.")
+    await update.message.reply_text("🔍 سأبدأ بفحص روابط واتساب المخزنة...\nاضغط على الأزرار للتحكم في الروابط.")
     
     # Store user state for link checking
     user_id = update.effective_user.id
@@ -122,11 +122,9 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['current_index'] = 0
     context.user_data['links_to_delete'] = []
     
-    # Combine all links with their types (limit to 10 for testing)
+    # Only WhatsApp links (limit to 3 for quick testing)
     all_links = []
-    for link in saved_links["t.me"][:5]:  # First 5 Telegram links
-        all_links.append(("t.me", link))
-    for link in saved_links["chat.whatsapp"][:5]:  # First 5 WhatsApp links
+    for link in saved_links["chat.whatsapp"][:3]:  # First 3 WhatsApp links
         all_links.append(("chat.whatsapp", link))
     
     context.user_data['current_links'] = all_links
